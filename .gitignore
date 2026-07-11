@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+.ai-os/
+*.env
+.env
+secrets.py
+*.db
+*.sqlite
+*.log
+.vscode/
