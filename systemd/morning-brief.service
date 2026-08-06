@@ -1,0 +1,7 @@
+[Unit]
+Description=SHAVY Morning Brief
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/projects/shavy-os/venv/bin/python3 %h/projects/shavy-os/morning/brief.py

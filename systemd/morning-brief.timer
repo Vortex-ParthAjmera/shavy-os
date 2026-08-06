@@ -1,0 +1,9 @@
+[Unit]
+Description=SHAVY Morning Brief - daily at 8 AM
+
+[Timer]
+OnCalendar=*-*-* 08:00:00
+OnBootSec=1min
+
+[Install]
+WantedBy=timers.target
