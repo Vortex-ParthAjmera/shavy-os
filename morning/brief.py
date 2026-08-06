@@ -89,6 +89,15 @@ def add_deadline(db, task, due_date, subject="General"):
     db.commit()
     print(f"Added: {task} due {due_date}")
 
+def remove_deadline(db, task):
+    """Delete a deadline by matching its task name"""
+    cursor = db.execute("DELETE FROM deadlines WHERE task = ?", (task,))
+    db.commit()
+    if cursor.rowcount > 0:
+        print(f"Removed: {task}")
+    else:
+        print(f"No deadline found matching: {task}")
+
 def generate_brief(papers, contests, deadlines, health):
     context = f"""Date: {datetime.now().strftime('%A, %B %d')}
 New papers: {papers}
@@ -118,6 +127,8 @@ if __name__ == "__main__":
     if len(sys.argv) >= 4 and sys.argv[1] == "add":
         add_deadline(db, sys.argv[2], sys.argv[3],
                     sys.argv[4] if len(sys.argv) > 4 else "General")
+    elif len(sys.argv) >= 3 and sys.argv[1] == "remove":
+        remove_deadline(db, sys.argv[2])
     else:
         print("Gathering your morning brief...\n")
         papers = get_new_papers()
