@@ -80,10 +80,23 @@ class Memory:
         )
         return results["documents"][0] if results["documents"] else []
 
+    def clear_all(self):
+        """Wipe everything. DEV/TESTING USE ONLY - never call this from
+        the real daemon, or you'd delete the user's actual memory history."""
+        self.db.execute("DELETE FROM interactions")
+        self.db.commit()
+        all_ids = self.collection.get()["ids"]
+        if all_ids:
+            self.collection.delete(ids=all_ids)
+
 
 if __name__ == "__main__":
     print("Testing SHAVY's memory system...\n")
     mem = Memory()
+
+    # Wipe old test data first, so re-running this file is always a clean,
+    # repeatable test instead of silently accumulating duplicates each time.
+    mem.clear_all()
 
     # Store a few test memories
     mem.store("What is dark matter?", "Dark matter is invisible matter that doesn't interact with light.")
