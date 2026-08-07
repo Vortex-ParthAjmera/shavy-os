@@ -1,8 +1,8 @@
-# SHAVY OS - AI Shell v0.3
+# SHAVY OS - AI Shell v0.4
 # Built by Parth Ajmera
-# Now the daemon can respond two ways: COMMAND (run something) or
-# ANSWER (just respond, including from memory) - instead of always
-# being forced to manufacture a shell command for every kind of input.
+# Case-insensitive COMMAND/ANSWER parsing, and now reports executed
+# commands back to the daemon via Remember() - so "what did I just run"
+# actually has real data behind it, not just past conversations.
 
 import subprocess
 from dasbus.connection import SessionMessageBus
@@ -19,9 +19,6 @@ BLOCKED_COMMANDS = [
 ]
 
 def ask_ai(what_you_want):
-    """Ask SHAVY. It decides: does this need a real command run,
-    or can it just be answered directly (including from memory)?"""
-
     instruction = f"""The user said: "{what_you_want}"
 
 Decide: does this need a bash command run on the system, or is it a
@@ -53,7 +50,7 @@ def run_command(command):
 
 def shavy_shell():
     print("=" * 50)
-    print("  SHAVY OS - AI Shell v0.3")
+    print("  SHAVY OS - AI Shell v0.4")
     print("  Built by Parth Ajmera")
     print("  Powered by the shared Intelligence Core Daemon")
     print("  Type what you want to do. Type 'quit' to exit.")
@@ -76,9 +73,10 @@ def shavy_shell():
 
         print("   SHAVY thinking...", end="\r")
         response = ask_ai(user_input)
+        response_upper = response.upper()
 
-        if response.startswith("COMMAND:"):
-            command = response[len("COMMAND:"):].strip()
+        if response_upper.startswith("COMMAND:"):
+            command = response[8:].strip()  # slice ORIGINAL, preserves casing
             print(f"   Command: {command}          ")
 
             if not is_safe(command):
@@ -88,6 +86,11 @@ def shavy_shell():
             permission = input("   Run this? (y/n): ").lower()
             if permission == "y":
                 output = run_command(command)
+
+                # Report what actually happened back to shared memory
+                remembered_output = output.strip()[:300] if output.strip() else "No output"
+                shavy.Remember(f"Command executed: {command}", remembered_output)
+
                 if output.strip():
                     print(f"   Result:\n{output}")
                 else:
@@ -95,12 +98,11 @@ def shavy_shell():
             else:
                 print("   Skipped.\n")
 
-        elif response.startswith("ANSWER:"):
-            answer = response[len("ANSWER:"):].strip()
+        elif response_upper.startswith("ANSWER:"):
+            answer = response[7:].strip()  # "ANSWER:" is 7 characters
             print(f"   SHAVY: {answer}          \n")
 
         else:
-            # Model didn't follow the format - show it raw rather than guess
             print(f"   SHAVY (unformatted): {response}          \n")
 
         print()
