@@ -1,17 +1,15 @@
-# SHAVY OS - AI Shell v0.2
+# SHAVY OS - AI Shell v0.3
 # Built by Parth Ajmera
-# Now calls the shared Intelligence Core Daemon over D-Bus,
-# instead of talking to Ollama directly (v0.1 style).
-# Requires core/daemon.py to be running in another terminal first.
+# Now the daemon can respond two ways: COMMAND (run something) or
+# ANSWER (just respond, including from memory) - instead of always
+# being forced to manufacture a shell command for every kind of input.
 
 import subprocess
 from dasbus.connection import SessionMessageBus
 
-# Connect to the daemon over D-Bus
 bus = SessionMessageBus()
 shavy = bus.get_proxy("com.shavy.AICore", "/com/shavy/AICore")
 
-# Commands that are too dangerous to ever run
 BLOCKED_COMMANDS = [
     "rm -rf /",
     "rm -rf ~",
@@ -21,16 +19,25 @@ BLOCKED_COMMANDS = [
 ]
 
 def ask_ai(what_you_want):
-    """Send your words to SHAVY's shared brain and get a command back"""
+    """Ask SHAVY. It decides: does this need a real command run,
+    or can it just be answered directly (including from memory)?"""
 
-    instruction = f"""Convert this request into ONE bash command.
-Reply with ONLY the command. No explanation. No markdown. No extra words.
+    instruction = f"""The user said: "{what_you_want}"
 
-Request: {what_you_want}
-Command:"""
+Decide: does this need a bash command run on the system, or is it a
+question you can answer directly, including from anything relevant
+in your memory of past interactions?
 
-    command = shavy.Query(instruction, "shell command generation")
-    return command.strip()
+If it needs a command, reply EXACTLY in this format (nothing else):
+COMMAND: <the bash command>
+
+If it's a question you can just answer, reply EXACTLY in this format:
+ANSWER: <your answer>
+
+Reply with ONLY one line, starting with COMMAND: or ANSWER:"""
+
+    response = shavy.Query(instruction, "shell interaction")
+    return response.strip()
 
 def is_safe(command):
     for dangerous in BLOCKED_COMMANDS:
@@ -46,9 +53,9 @@ def run_command(command):
 
 def shavy_shell():
     print("=" * 50)
-    print("  SHAVY OS - AI Shell v0.2")
+    print("  SHAVY OS - AI Shell v0.3")
     print("  Built by Parth Ajmera")
-    print("  Now powered by the shared Intelligence Core Daemon")
+    print("  Powered by the shared Intelligence Core Daemon")
     print("  Type what you want to do. Type 'quit' to exit.")
     print("=" * 50)
     print()
@@ -68,24 +75,33 @@ def shavy_shell():
             continue
 
         print("   SHAVY thinking...", end="\r")
-        command = ask_ai(user_input)
+        response = ask_ai(user_input)
 
-        print(f"   Command: {command}          ")
+        if response.startswith("COMMAND:"):
+            command = response[len("COMMAND:"):].strip()
+            print(f"   Command: {command}          ")
 
-        if not is_safe(command):
-            print("   SHAVY: I won't run that -- it could be dangerous.\n")
-            continue
+            if not is_safe(command):
+                print("   SHAVY: I won't run that -- it could be dangerous.\n")
+                continue
 
-        permission = input("   Run this? (y/n): ").lower()
-
-        if permission == "y":
-            output = run_command(command)
-            if output.strip():
-                print(f"   Result:\n{output}")
+            permission = input("   Run this? (y/n): ").lower()
+            if permission == "y":
+                output = run_command(command)
+                if output.strip():
+                    print(f"   Result:\n{output}")
+                else:
+                    print("   Done! (no output)")
             else:
-                print("   Done! (no output)")
+                print("   Skipped.\n")
+
+        elif response.startswith("ANSWER:"):
+            answer = response[len("ANSWER:"):].strip()
+            print(f"   SHAVY: {answer}          \n")
+
         else:
-            print("   Skipped.\n")
+            # Model didn't follow the format - show it raw rather than guess
+            print(f"   SHAVY (unformatted): {response}          \n")
 
         print()
 
