@@ -1,17 +1,12 @@
-# SHAVY OS - Intelligence Core Daemon v0.2
-# The always-on D-Bus service every other piece of SHAVY calls into.
-# ai_shell.py and brief.py call this instead of talking to Ollama directly,
-# so there's one shared brain instead of every script reinventing the
-# same Ollama calls.
-# v0.2 adds Remember() - lets other components report real events (like
-# "I ran this command, here's the output") directly into shared memory,
-# without needing a full LLM round-trip just to store a fact.
+# SHAVY OS - Intelligence Core Daemon v0.3
+# v0.3 fix: Query() now keeps "prompt" (what gets remembered/searched)
+# separate from "context" (formatting/instructions that shape the
+# response but shouldn't pollute memory with repeated boilerplate).
 
 import sys
 import requests
 from pathlib import Path
 
-# Reuse the Memory class we already built and tested
 sys.path.insert(0, str(Path(__file__).parent))
 from memory import Memory
 
@@ -24,12 +19,6 @@ MODEL = "qwen3.5:9b"
 
 @dbus_interface("com.shavy.AICore")
 class ShavyCore:
-    """
-    The D-Bus service itself. Any process on this machine can call
-    Query() or Remember() on this over the session bus - that's the
-    whole point of it existing.
-    """
-
     def __init__(self):
         print("SHAVY Core: loading memory system...")
         self.memory = Memory()
@@ -37,12 +26,11 @@ class ShavyCore:
 
     def Query(self, prompt: str, context: str) -> str:
         """
-        The main method everything else calls to actually talk to the AI.
-        prompt: what the user said
-        context: extra info as a string (can be empty "" for now)
-        Returns: the AI's response
+        prompt: the CLEAN thing being asked/said - this is what gets
+        searched and stored in memory, kept short and meaningful.
+        context: formatting rules or extra instructions - shapes the
+        LLM's response but is never itself stored as "what the user said".
         """
-        # Pull in relevant past memories, so responses have continuity
         relevant_memories = self.memory.recall_similar(prompt, n=3)
         memory_text = "\n".join(relevant_memories) if relevant_memories else "None yet."
 
@@ -51,7 +39,7 @@ class ShavyCore:
 Relevant past context:
 {memory_text}
 
-Current context: {context}
+{context}
 
 User: {prompt}
 SHAVY:"""
@@ -68,18 +56,10 @@ SHAVY:"""
         )
         answer = response.json()["response"].strip()
 
-        # Remember this exchange for next time
         self.memory.store(prompt, answer)
-
         return answer
 
     def Remember(self, content: str, metadata: str) -> bool:
-        """
-        Store something directly in memory, no LLM call involved.
-        Lets other SHAVY components (like ai_shell.py) report real events
-        - "I ran X, got Y" - so future memory-based answers have
-        something true to draw on, instead of just past conversations.
-        """
         try:
             self.memory.store(content, metadata)
             return True
