@@ -1,13 +1,15 @@
-# SHAVY OS - AI Shell v0.1
+# SHAVY OS - AI Shell v0.2
 # Built by Parth Ajmera
-# This is the first piece of SHAVY OS
+# Now calls the shared Intelligence Core Daemon over D-Bus,
+# instead of talking to Ollama directly (v0.1 style).
+# Requires core/daemon.py to be running in another terminal first.
 
 import subprocess
-import requests
+from dasbus.connection import SessionMessageBus
 
-# The address of your local AI (running on YOUR computer, not the internet)
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "qwen3.5:9b"
+# Connect to the daemon over D-Bus
+bus = SessionMessageBus()
+shavy = bus.get_proxy("com.shavy.AICore", "/com/shavy/AICore")
 
 # Commands that are too dangerous to ever run
 BLOCKED_COMMANDS = [
@@ -19,53 +21,34 @@ BLOCKED_COMMANDS = [
 ]
 
 def ask_ai(what_you_want):
-    """Send your words to the AI and get a command back"""
+    """Send your words to SHAVY's shared brain and get a command back"""
 
-    instruction = f"""You are SHAVY, an AI operating system.
-The user wants to do something on their Linux computer.
-Convert their request into ONE bash command.
+    instruction = f"""Convert this request into ONE bash command.
 Reply with ONLY the command. No explanation. No markdown. No extra words.
 
-User request: {what_you_want}
+Request: {what_you_want}
 Command:"""
 
-    response = requests.post(
-        OLLAMA_URL,
-        json={
-            "model": MODEL,
-            "prompt": instruction,
-            "stream": False,
-            "think": False
-        },
-        timeout=30
-    )
-
-    command = response.json()["response"].strip()
-    return command
+    command = shavy.Query(instruction, "shell command generation")
+    return command.strip()
 
 def is_safe(command):
-    """Check if the command is safe to run"""
     for dangerous in BLOCKED_COMMANDS:
         if dangerous in command:
             return False
     return True
 
 def run_command(command):
-    """Actually run the command on your computer"""
     result = subprocess.run(
-        command,
-        shell=True,
-        capture_output=True,
-        text=True,
-        timeout=30
+        command, shell=True, capture_output=True, text=True, timeout=30
     )
     return result.stdout + result.stderr
 
 def shavy_shell():
-    """The main SHAVY shell loop"""
     print("=" * 50)
-    print("  SHAVY OS - AI Shell v0.1")
+    print("  SHAVY OS - AI Shell v0.2")
     print("  Built by Parth Ajmera")
+    print("  Now powered by the shared Intelligence Core Daemon")
     print("  Type what you want to do. Type 'quit' to exit.")
     print("=" * 50)
     print()
