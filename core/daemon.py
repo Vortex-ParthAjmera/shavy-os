@@ -1,7 +1,8 @@
-# SHAVY OS - Intelligence Core Daemon v0.3
-# v0.3 fix: Query() now keeps "prompt" (what gets remembered/searched)
-# separate from "context" (formatting/instructions that shape the
-# response but shouldn't pollute memory with repeated boilerplate).
+# SHAVY OS - Intelligence Core Daemon v0.4
+# v0.4: added debug visibility into what memory actually gets retrieved,
+# so we can SEE the internal state instead of guessing at it from outside.
+# Also relabeled the memory section to more directly tell the model to
+# check it before deciding a new command is needed.
 
 import sys
 import requests
@@ -25,18 +26,18 @@ class ShavyCore:
         print("SHAVY Core: ready.")
 
     def Query(self, prompt: str, context: str) -> str:
-        """
-        prompt: the CLEAN thing being asked/said - this is what gets
-        searched and stored in memory, kept short and meaningful.
-        context: formatting rules or extra instructions - shapes the
-        LLM's response but is never itself stored as "what the user said".
-        """
         relevant_memories = self.memory.recall_similar(prompt, n=3)
-        memory_text = "\n".join(relevant_memories) if relevant_memories else "None yet."
+        memory_text = "\n---\n".join(relevant_memories) if relevant_memories else "None yet."
+
+        # DEBUG: show exactly what's being retrieved, right here in the
+        # daemon's own terminal - this is the thing we actually need to see
+        print(f"\n[DEBUG] Incoming query: {prompt}")
+        print(f"[DEBUG] Memories retrieved:\n{memory_text}")
+        print("[DEBUG] ---")
 
         full_prompt = f"""You are SHAVY, an AI operating system assistant.
 
-Relevant past context:
+FACTS FROM YOUR MEMORY (check here FIRST - if the answer is already here, use it, don't generate a new command):
 {memory_text}
 
 {context}
