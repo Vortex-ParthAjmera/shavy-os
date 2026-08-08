@@ -1,7 +1,9 @@
-# SHAVY OS - Morning Brief v0.1
+# SHAVY OS - Morning Brief v0.2
 # Fetches: new papers (astrophysics, quantum computing, AI/ML, data science,
 # computer science), Codeforces contests, your deadlines
-# Prints a synthesized brief. (Spoken aloud comes later, in Phase 5 - voice.)
+# v0.2: now calls the shared Intelligence Core Daemon over D-Bus, same as
+# ai_shell.py, instead of talking to Ollama directly.
+# Requires core/daemon.py to be running in another terminal first.
 
 import subprocess
 import requests
@@ -10,10 +12,13 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import xml.etree.ElementTree as ET
+from dasbus.connection import SessionMessageBus
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "qwen3.5:9b"
 DB_PATH = Path.home() / ".ai-os" / "memory.db"
+
+# Connect to the daemon over D-Bus
+bus = SessionMessageBus()
+shavy = bus.get_proxy("com.shavy.AICore", "/com/shavy/AICore")
 
 def init_db():
     """Make sure the deadlines table exists before we use it"""
@@ -90,7 +95,6 @@ def add_deadline(db, task, due_date, subject="General"):
     print(f"Added: {task} due {due_date}")
 
 def remove_deadline(db, task):
-    """Delete a deadline by matching its task name"""
     cursor = db.execute("DELETE FROM deadlines WHERE task = ?", (task,))
     db.commit()
     if cursor.rowcount > 0:
@@ -99,27 +103,20 @@ def remove_deadline(db, task):
         print(f"No deadline found matching: {task}")
 
 def generate_brief(papers, contests, deadlines, health):
-    context = f"""Date: {datetime.now().strftime('%A, %B %d')}
+    # The DATA is the "prompt" (clean, meaningful, worth remembering/searching)
+    data_summary = f"""Date: {datetime.now().strftime('%A, %B %d')}
 New papers: {papers}
 Upcoming contests: {contests}
 Deadlines: {deadlines or ['Nothing urgent']}
 System: {health}"""
 
-    prompt = f"""You are SHAVY, a morning briefing assistant for a CS student
-and researcher across astrophysics, quantum computing, AI/ML, data science,
-and computer science. Write a short brief (60-90 words). Be direct.
-Lead with the most time-sensitive item.
+    # The STYLE RULES are the "context" (formatting instructions, not data)
+    instructions = """You are SHAVY, a morning briefing assistant for a CS
+student and researcher across astrophysics, quantum computing, AI/ML, data
+science, and computer science. Write a short brief (60-90 words). Be direct.
+Lead with the most time-sensitive item."""
 
-{context}
-
-Brief:"""
-
-    response = requests.post(
-        OLLAMA_URL,
-        json={"model": MODEL, "prompt": prompt, "stream": False, "think": False},
-        timeout=30
-    )
-    return response.json()["response"].strip()
+    return shavy.Query(data_summary, instructions)
 
 if __name__ == "__main__":
     db = init_db()
