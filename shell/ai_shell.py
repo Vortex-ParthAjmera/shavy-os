@@ -1,10 +1,14 @@
-# SHAVY OS - AI Shell v0.5
+# SHAVY OS - AI Shell v0.6
 # Built by Parth Ajmera
-# v0.5 fix: sends your CLEAN words as the memory-searchable prompt,
-# and moves the COMMAND/ANSWER formatting rules into context instead -
-# so memory stores real content, not repeated formatting boilerplate.
+# Multilingual: English, Hindi (Devanagari), and Hinglish (Roman-script
+# Hindi/English mix). Hindi is detected via Unicode range - 100% reliable.
+# Hinglish has no distinct script to detect, so it isn't detected
+# separately - it's sent straight to the daemon, which understands it
+# natively the same way it understands English. One call handles all three,
+# no separate translation step needed.
 
 import subprocess
+import re
 from dasbus.connection import SessionMessageBus
 
 bus = SessionMessageBus()
@@ -18,7 +22,14 @@ BLOCKED_COMMANDS = [
     "shutdown",
 ]
 
-FORMAT_INSTRUCTIONS = """Decide: does this need a bash command run on the system, or is it a
+# Devanagari Unicode block - covers Hindi script reliably, no library needed
+DEVANAGARI_PATTERN = re.compile(r'[\u0900-\u097F]')
+
+FORMAT_INSTRUCTIONS = """The user may write in English, Hindi (Devanagari
+script), or Hinglish (Hindi words in Roman letters, mixed with English) -
+understand whichever they use directly.
+
+Decide: does this need a bash command run on the system, or is it a
 question you can answer directly, including from anything relevant
 in your memory of past interactions?
 
@@ -29,6 +40,12 @@ If it's a question you can just answer, reply EXACTLY in this format:
 ANSWER: <your answer>
 
 Reply with ONLY one line, starting with COMMAND: or ANSWER:"""
+
+def detect_hindi(text):
+    """True if the input contains Devanagari script. Doesn't try to
+    separately detect Hinglish - that's handled natively by the LLM,
+    no detection step needed for it."""
+    return bool(DEVANAGARI_PATTERN.search(text))
 
 def ask_ai(what_you_want):
     response = shavy.Query(what_you_want, FORMAT_INSTRUCTIONS)
@@ -48,9 +65,10 @@ def run_command(command):
 
 def shavy_shell():
     print("=" * 50)
-    print("  SHAVY OS - AI Shell v0.5")
+    print("  SHAVY OS - AI Shell v0.6")
     print("  Built by Parth Ajmera")
     print("  Powered by the shared Intelligence Core Daemon")
+    print("  English, Hindi, and Hinglish all work.")
     print("  Type what you want to do. Type 'quit' to exit.")
     print("=" * 50)
     print()
@@ -68,6 +86,9 @@ def shavy_shell():
 
         if not user_input:
             continue
+
+        if detect_hindi(user_input):
+            print("   🇮🇳 (Hindi detected)")
 
         print("   SHAVY thinking...", end="\r")
         response = ask_ai(user_input)
