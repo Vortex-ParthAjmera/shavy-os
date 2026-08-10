@@ -1,11 +1,14 @@
-# SHAVY OS - AI Shell v0.6
+# SHAVY OS - AI Shell v0.7
 # Built by Parth Ajmera
 # Multilingual: English, Hindi (Devanagari), and Hinglish (Roman-script
 # Hindi/English mix). Hindi is detected via Unicode range - 100% reliable.
 # Hinglish has no distinct script to detect, so it isn't detected
 # separately - it's sent straight to the daemon, which understands it
-# natively the same way it understands English. One call handles all three,
-# no separate translation step needed.
+# natively the same way it understands English.
+# v0.7: file-search commands now exclude common dependency/noise folders
+# by default (venv, .git, node_modules, __pycache__) - discovered when
+# "sabhi python files dikhao" correctly found every .py file, including
+# thousands belonging to installed libraries inside venv/.
 
 import subprocess
 import re
@@ -22,7 +25,6 @@ BLOCKED_COMMANDS = [
     "shutdown",
 ]
 
-# Devanagari Unicode block - covers Hindi script reliably, no library needed
 DEVANAGARI_PATTERN = re.compile(r'[\u0900-\u097F]')
 
 FORMAT_INSTRUCTIONS = """The user may write in English, Hindi (Devanagari
@@ -39,12 +41,15 @@ COMMAND: <the bash command>
 If it's a question you can just answer, reply EXACTLY in this format:
 ANSWER: <your answer>
 
+When a command searches or lists files recursively (find, ls -R, grep -r,
+etc.), exclude these common non-project directories by default, since
+they're installed dependencies or metadata, not the user's own files:
+venv/, .venv/, node_modules/, .git/, __pycache__/
+Only include them if the user explicitly asks to.
+
 Reply with ONLY one line, starting with COMMAND: or ANSWER:"""
 
 def detect_hindi(text):
-    """True if the input contains Devanagari script. Doesn't try to
-    separately detect Hinglish - that's handled natively by the LLM,
-    no detection step needed for it."""
     return bool(DEVANAGARI_PATTERN.search(text))
 
 def ask_ai(what_you_want):
@@ -65,7 +70,7 @@ def run_command(command):
 
 def shavy_shell():
     print("=" * 50)
-    print("  SHAVY OS - AI Shell v0.6")
+    print("  SHAVY OS - AI Shell v0.7")
     print("  Built by Parth Ajmera")
     print("  Powered by the shared Intelligence Core Daemon")
     print("  English, Hindi, and Hinglish all work.")
