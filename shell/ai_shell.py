@@ -1,14 +1,13 @@
-# SHAVY OS - AI Shell v0.7
+# SHAVY OS - AI Shell v0.8
 # Built by Parth Ajmera
 # Multilingual: English, Hindi (Devanagari), and Hinglish (Roman-script
 # Hindi/English mix). Hindi is detected via Unicode range - 100% reliable.
 # Hinglish has no distinct script to detect, so it isn't detected
 # separately - it's sent straight to the daemon, which understands it
 # natively the same way it understands English.
-# v0.7: file-search commands now exclude common dependency/noise folders
-# by default (venv, .git, node_modules, __pycache__) - discovered when
-# "sabhi python files dikhao" correctly found every .py file, including
-# thousands belonging to installed libraries inside venv/.
+# v0.8: file-search commands now explicitly required to use relative paths
+# (./) - discovered the model was combining $(pwd) absolute paths with
+# ./-anchored exclude filters, which silently matched nothing at all.
 
 import subprocess
 import re
@@ -42,10 +41,15 @@ If it's a question you can just answer, reply EXACTLY in this format:
 ANSWER: <your answer>
 
 When a command searches or lists files recursively (find, ls -R, grep -r,
-etc.), exclude these common non-project directories by default, since
-they're installed dependencies or metadata, not the user's own files:
-venv/, .venv/, node_modules/, .git/, __pycache__/
-Only include them if the user explicitly asks to.
+etc.):
+- Always search using a relative path (. or ./something), never $(pwd) or
+  an absolute path - this matters because any exclude filters must match
+  the same path format the search itself produces, or they silently do
+  nothing.
+- Exclude these common non-project directories by default, since they're
+  installed dependencies or metadata, not the user's own files: venv/,
+  .venv/, node_modules/, .git/, __pycache__/
+- Only include them if the user explicitly asks to.
 
 Reply with ONLY one line, starting with COMMAND: or ANSWER:"""
 
@@ -70,7 +74,7 @@ def run_command(command):
 
 def shavy_shell():
     print("=" * 50)
-    print("  SHAVY OS - AI Shell v0.7")
+    print("  SHAVY OS - AI Shell v0.8")
     print("  Built by Parth Ajmera")
     print("  Powered by the shared Intelligence Core Daemon")
     print("  English, Hindi, and Hinglish all work.")
